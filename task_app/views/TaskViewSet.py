@@ -17,11 +17,14 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth.models import User
+
+
 
 
 
 class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 20
+    page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 100
 
@@ -70,11 +73,89 @@ class TaskViewSet(viewsets.ModelViewSet):
         instances = serializer.save()
         out = TaskSerializer(instances, many=True, context={"request": request})
         return Response(out.data, status=status.HTTP_201_CREATED)
+    
+    def perform_create(self, serializer):
+        serializer.save()
 
-   
+    def perform_update(self, serializer):
+        print("perform_update called")
+        serializer.save()
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        data = request.data
+
+        # Update normal fields
+        for field in ['title', 'description', 'status', 'priority', 'due_date', 'assigned_to']:
+            if field in data:
+                if field == 'assigned_to' and data[field] is not None:
+                    try:
+                        user = User.objects.get(pk=data[field])
+                        setattr(instance, field, user)
+                    except User.DoesNotExist:
+                        return Response({"assigned_to": "User not found"}, status=status.HTTP_400_BAD_REQUEST)
+                elif field == 'due_date' and data[field]:
+                    setattr(instance, field, data[field])
+                else:
+                    setattr(instance, field, data[field])
+        instance.save()
+
+        # Handle tags manually
+        tags_data = data.get('tags')
+        if tags_data is not None:
+            for tag in tags_data:
+                # If tag is string
+                tag_name = tag.get('name') if isinstance(tag, dict) else str(tag)
+                if tag_name:
+                    tag_obj, _ = Tag.objects.get_or_create(name=tag_name)
+                    instance.tags.add(tag_obj)  # add() will avoid duplicates
+
+        # Prepare response manually
+        response_data = {
+            "id": instance.id,
+            "title": instance.title,
+            "description": instance.description,
+            "status": instance.status,
+            "priority": instance.priority,
+            "due_date": instance.due_date,
+            "assigned_to": instance.assigned_to.id if instance.assigned_to else None,
+            "created_by": instance.created_by.username,
+            "tags": [{"id": t.id, "name": t.name} for t in instance.tags.all()],
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+    
+    
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = request.user
+
+        # Extract tags from payload
+        tags_data = data.pop('tags', [])
+
+        # Create task
+        task = Task.objects.create(
+            title=data.get('title'),
+            description=data.get('description'),
+            status=data.get('status', 'todo'),
+            priority=data.get('priority', 'medium'),
+            due_date=data.get('due_date'),
+            assigned_to=User.objects.get(pk=data['assigned_to']) if data.get('assigned_to') else None,
+            created_by=user
+        )
+
+        # Handle tags: create if not exists, then add to task
+        for tag in tags_data:
+            tag_name = tag.get('name') if isinstance(tag, dict) else str(tag)
+            if tag_name:
+                tag_obj, _ = Tag.objects.get_or_create(name=tag_name)
+                task.tags.add(tag_obj)
+
+        serializer = self.get_serializer(task)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
   
 
 
+# comment view set 
 class CommentViewSet(viewsets.ModelViewSet):
     """
     Nested-like comment endpoints (we use task_pk in URL conf).
@@ -102,6 +183,9 @@ class CommentViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+
+
+# file upload view
 class FileUploadView(
     mixins.CreateModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):

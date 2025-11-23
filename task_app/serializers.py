@@ -45,26 +45,23 @@ class TaskSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         tags_data = validated_data.pop('tags', [])
         user = self.context['request'].user
-        print("my user",user)
         task = Task.objects.create(created_by=user, **validated_data)
+
         for tag in tags_data:
-            tag_obj, _ = Tag.objects.get_or_create(name=tag.get('name'))
-            task.tags.add(tag_obj)
+            # Ensure we get the string value from tag object
+            tag_name = tag.get('name') if isinstance(tag, dict) else str(tag)
+            if tag_name:
+                print("tag_name",tag_name)
+                tag_obj, created = Tag.objects.get_or_create(name=tag_name)
+                task.tags.add(tag_obj)
+
         return task
 
 
-    def update(self, instance, validated_data):
-        tags_data = validated_data.pop('tags', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if tags_data is not None:
-            instance.tags.clear()
-            for tag in tags_data:
-                tag_obj, _ = Tag.objects.get_or_create(name=tag.get('name'))
-                instance.tags.add(tag_obj)
-        return instance
+  
     
+    
+
 
 
 # comment serializer
