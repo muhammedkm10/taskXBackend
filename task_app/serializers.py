@@ -82,11 +82,8 @@ class BulkTaskCreateSerializer(serializers.ListSerializer):
     def create(self, validated_data):
         user = self.context['request'].user
         instances = []
+        print("Vaidated data:", validated_data)
         for item in validated_data:
             tags = item.pop('tags', [])
             t = Task.objects.create(created_by=user, **item)
-            for tag in tags:
-                tag_obj, _ = Tag.objects.get_or_create(name=tag.get('name'))
-                t.tags.add(tag_obj)
-            instances.append(t)
-            return instances
+        return instances
