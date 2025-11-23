@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import RegisterView, CurrentUserView
+from .views import RegisterView, CurrentUserView , AllUsersView
 
 urlpatterns = [
     # Signup
@@ -13,7 +13,8 @@ urlpatterns = [
     path("refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # Current user profile
-    path("user_profile/", CurrentUserView.as_view(), name="current_user"),
+    path("user-profile/", CurrentUserView.as_view(), name="current_user"),
+    path("all-users/", AllUsersView.as_view(), name="all_users"),
 ]
 
 

@@ -49,8 +49,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         qs = Task.objects.select_related("assigned_to", "created_by").prefetch_related("tags")
         # Filter deleted tasks unless admin explicitly requests
         include_deleted = self.request.query_params.get("include_deleted", "false").lower()
-        if include_deleted not in ("true", "1", "yes") or not self.request.user.is_staff:
-            qs = qs.filter(is_deleted=False)
+        if include_deleted  in ("true", "1", "yes") :
+            print("i am working")
+            qs = qs.filter(is_deleted=True)
 
         # Filter by current user
         return qs.filter(created_by=self.request.user)
