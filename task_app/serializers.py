@@ -28,11 +28,18 @@ class FileAttachmentSerializer(serializers.ModelSerializer):
         if obj.file and request:
             return request.build_absolute_uri(obj.file.url)
         return None
-
+    
+    
+# assign user serializer
+class AssignUserSerializer(serializers.Serializer):
+    class Meta:
+        model = User
+        fields = ['id','username','email']
+        
 # task serializer
 class TaskSerializer(serializers.ModelSerializer):
     created_by = serializers.ReadOnlyField(source='created_by.username')
-    assigned_to = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
+    assigned_to = AssignUserSerializer(read_only=True) 
     tags = TagSerializer(many=True, required=False)
     files = FileAttachmentSerializer(many=True, read_only=True)
 
@@ -42,20 +49,8 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = ['id','title','description','status','priority','due_date','tags','assigned_to','created_by','created_at','updated_at','files']
 
 
-    def create(self, validated_data):
-        tags_data = validated_data.pop('tags', [])
-        user = self.context['request'].user
-        task = Task.objects.create(created_by=user, **validated_data)
+    
 
-        for tag in tags_data:
-            # Ensure we get the string value from tag object
-            tag_name = tag.get('name') if isinstance(tag, dict) else str(tag)
-            if tag_name:
-                print("tag_name",tag_name)
-                tag_obj, created = Tag.objects.get_or_create(name=tag_name)
-                task.tags.add(tag_obj)
-
-        return task
 
 
   

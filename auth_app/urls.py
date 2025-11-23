@@ -14,7 +14,7 @@ urlpatterns = [
 
     # Current user profile
     path("user-profile/", CurrentUserView.as_view(), name="current_user"),
-    path("all-users/", AllUsersView.as_view(), name="all_users"),
+    path("all-users/", AllUsersView.as_view({'get': 'list'}), name="all_users"),
 ]
 
 

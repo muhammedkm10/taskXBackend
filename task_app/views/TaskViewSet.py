@@ -30,11 +30,6 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    """
-    filter/search/order
-    soft delete 
-    bulk-create endpoint
-    """
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
@@ -43,30 +38,71 @@ class TaskViewSet(viewsets.ModelViewSet):
     search_fields = ["title", "description", "tags__name"]
     ordering_fields = ["due_date", "created_at", "priority"]
     pagination_class = StandardResultsSetPagination
-
+    
+    
+    # getting data to front end 
     def get_queryset(self):
         # Base queryset with related fields
         qs = Task.objects.select_related("assigned_to", "created_by").prefetch_related("tags")
         # Filter deleted tasks unless admin explicitly requests
         include_deleted = self.request.query_params.get("include_deleted", "false").lower()
         if include_deleted  in ("true", "1", "yes") :
-            print("i am working")
             qs = qs.filter(is_deleted=True)
 
         # Filter by current user
         return qs.filter(created_by=self.request.user)
 
-   
-   
+    
+    # assign task to user
+    @action(detail=True, methods=['post'], url_path='assign-user/(?P<user_id>[^/.]+)')
+    def assign_user(self, request, pk=None, user_id=None):
+        task = self.get_object()
+        print("user id",user_id,pk)
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"success": False, "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        if task.assigned_to:
+            if task.assigned_to.id == user.id:
+                return Response({
+                    "success": False,
+                    "message": f"User '{user.username}' is already assigned to this task."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Optional: notify that the previous user will be replaced
+                old_user = task.assigned_to
+                task.assigned_to = user
+                task.save()
+                return Response({
+                    "success": True,
+                    "message": f"Task reassigned from '{old_user.username}' to '{user.username}'.",
+                    "data": {
+                        "task_id": task.id,
+                        "assigned_to": {"id": user.id, "username": user.username, "full_name": user.get_full_name()}
+                    }
+                }, status=status.HTTP_200_OK)
+
+        # No user assigned yet, assign directly
+        task.assigned_to = user
+        task.save()
+        return Response({
+            "success": True,
+            "message": f"User '{user.username}' assigned to task '{task.title}'",
+            "data": {
+                "task_id": task.id,
+                "assigned_to": {"id": user.id, "username": user.username, "full_name": user.get_full_name()}
+            }
+        }, status=status.HTTP_200_OK)
+
+
+    # soft delete implementation
     def destroy(self, request, *args, **kwargs):
-        """
-        Soft delete: mark is_deleted and set deleted_at (model method handles it).
-        """
         instance = self.get_object()
         instance.soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # bulk create endpoint
     @action(detail=False, methods=["post"], url_path="bulk-create")
     def bulk_create(self, request):
         serializer = BulkTaskCreateSerializer(data=request.data, context={"request": request})
@@ -75,13 +111,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         out = TaskSerializer(instances, many=True, context={"request": request})
         return Response(out.data, status=status.HTTP_201_CREATED)
     
-    def perform_create(self, serializer):
-        serializer.save()
-
-    def perform_update(self, serializer):
-        print("perform_update called")
-        serializer.save()
-
+    # perform create and update
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         data = request.data

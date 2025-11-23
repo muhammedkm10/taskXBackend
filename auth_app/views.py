@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer, UserSerializer
+from rest_framework import viewsets
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -18,7 +19,10 @@ class CurrentUserView(generics.RetrieveAPIView):
         return self.request.user
     
     
-class AllUsersView(generics.ListAPIView):
+class AllUsersView(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+
+    # Disable pagination
+    pagination_class = None
