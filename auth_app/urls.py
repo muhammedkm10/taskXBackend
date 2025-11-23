@@ -15,3 +15,7 @@ urlpatterns = [
     # Current user profile
     path("user_profile/", CurrentUserView.as_view(), name="current_user"),
 ]
+
+
+
+
