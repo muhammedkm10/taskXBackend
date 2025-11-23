@@ -19,6 +19,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 
 
+
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
@@ -27,10 +28,9 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 class TaskViewSet(viewsets.ModelViewSet):
     """
-    CRUD for tasks with:
-      - filter/search/order
-      - soft delete (destroy => soft delete)
-      - bulk-create endpoint
+    filter/search/order
+    soft delete 
+    bulk-create endpoint
     """
     queryset = (
         Task.objects.filter(is_deleted=False)

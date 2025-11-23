@@ -26,7 +26,7 @@ SECRET_KEY = "django-insecure-iofylt7may#wj^48oiiz_47-^r__f18-391ies89x9sakd8jub
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 
@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "task_app"
 ]
 
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -62,7 +63,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ORIGINS = [
+    "http://localhost:3000",
+    'http://localhost:5173/',
+]
 
 
 REST_FRAMEWORK = {
