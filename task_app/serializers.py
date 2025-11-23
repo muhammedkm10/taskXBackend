@@ -31,7 +31,7 @@ class FileAttachmentSerializer(serializers.ModelSerializer):
 
 # task serializer
 class TaskSerializer(serializers.ModelSerializer):
-    created_by = serializers.ReadOnlyField(source='created_by.id')
+    created_by = serializers.ReadOnlyField(source='created_by.username')
     assigned_to = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True, required=False)
     tags = TagSerializer(many=True, required=False)
     files = FileAttachmentSerializer(many=True, read_only=True)
@@ -45,6 +45,7 @@ class TaskSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         tags_data = validated_data.pop('tags', [])
         user = self.context['request'].user
+        print("my user",user)
         task = Task.objects.create(created_by=user, **validated_data)
         for tag in tags_data:
             tag_obj, _ = Tag.objects.get_or_create(name=tag.get('name'))

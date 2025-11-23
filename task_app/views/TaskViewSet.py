@@ -32,14 +32,9 @@ class TaskViewSet(viewsets.ModelViewSet):
     soft delete 
     bulk-create endpoint
     """
-    queryset = (
-        Task.objects.filter(is_deleted=False)
-        .select_related("assigned_to", "created_by")
-        .prefetch_related("tags")
-    )
+    queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = (FormParser, MultiPartParser)
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["status", "priority", "assigned_to", "created_by"]
     search_fields = ["title", "description", "tags__name"]
@@ -47,18 +42,18 @@ class TaskViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        # Example: allow admin to see deleted tasks via query param ?include_deleted=true
+        # Base queryset with related fields
         qs = Task.objects.select_related("assigned_to", "created_by").prefetch_related("tags")
+        # Filter deleted tasks unless admin explicitly requests
         include_deleted = self.request.query_params.get("include_deleted", "false").lower()
-        if include_deleted in ("true", "1", "yes") and self.request.user.is_staff:
-            return qs
-        return qs.filter(is_deleted=False)
+        if include_deleted not in ("true", "1", "yes") or not self.request.user.is_staff:
+            qs = qs.filter(is_deleted=False)
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        # Filter by current user
+        return qs.filter(created_by=self.request.user)
 
-    def perform_update(self, serializer):
-        serializer.save()
+   
+   
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -77,9 +72,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response(out.data, status=status.HTTP_201_CREATED)
 
    
-    def partial_update(self, request, *args, **kwargs):
-        # allow partial updates
-        return super().partial_update(request, *args, **kwargs)
+  
 
 
 class CommentViewSet(viewsets.ModelViewSet):
