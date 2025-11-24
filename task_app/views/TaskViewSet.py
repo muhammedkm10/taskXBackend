@@ -44,13 +44,14 @@ class TaskViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Base queryset with related fields
         qs = Task.objects.select_related("assigned_to", "created_by").prefetch_related("tags")
+        print(qs)
         # Filter deleted tasks unless admin explicitly requests
         include_deleted = self.request.query_params.get("include_deleted", "false").lower()
         if include_deleted  in ("true", "1", "yes") :
             qs = qs.filter(is_deleted=True)
-
         # Filter by current user
         return qs.filter(created_by=self.request.user)
+
 
     
     # assign task to user
@@ -238,47 +239,43 @@ class CommentViewSet(viewsets.ModelViewSet):
 
 
 # file upload view
-class FileUploadView(
-    mixins.CreateModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
-):
-    """
-    Handles file uploads related to a task.
-    URLs expected: /tasks/{task_pk}/files/ and /tasks/{task_pk}/files/{pk}/
-    """
-
+class FileUploadViewSet(viewsets.ModelViewSet):
     serializer_class = FileAttachmentSerializer
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
+    pagination_class = None
 
+    # fetching files
     def get_queryset(self):
-        task_id = self.kwargs.get("task_pk")
-        qs = FileAttachment.objects.all().select_related("uploaded_by")
+        task_id = self.request.query_params.get("task_pk")
+        qs = FileAttachment.objects.select_related("uploaded_by")
         if task_id:
             qs = qs.filter(task_id=task_id)
         return qs.order_by("-uploaded_at")
 
-    def perform_create(self, serializer):
-        # Validate that task exists and is not deleted
-        task_id = self.kwargs.get("task_pk")
-        task = get_object_or_404(Task, pk=task_id, is_deleted=False)
 
-        # File validators could be enforced in serializer.validate()
-        file_obj = serializer.validated_data.get("file", None)
+    # updload files
+    def perform_create(self, serializer):
+        task_id = self.request.data.get("task_id")
+        if not task_id:
+            raise ValidationError({"task_id": "task_id is required"})
+        task = get_object_or_404(Task, pk=task_id, is_deleted=False)
+        file_obj = serializer.validated_data.get("file")
         if not file_obj:
             raise ValidationError({"file": "No file provided."})
+        serializer.save(
+            uploaded_by=self.request.user,
+            task=task,
+            filename=file_obj.name,
+            content_type=file_obj.content_type,
+            size=file_obj.size,
+        )
 
-        # Example: simple size check (10 MB)
-        max_size = 10 * 1024 * 1024
-        if file_obj.size > max_size:
-            raise ValidationError({"file": "File size exceeds 10 MB limit."})
 
-        serializer.save(uploaded_by=self.request.user, task=task, filename=file_obj.name)
-
+    # destroy files
     def destroy(self, request, *args, **kwargs):
-        # Deleting an uploaded FileAttachment will delete the file (depends on storage)
         instance = self.get_object()
-        instance.file.delete(save=False)  # remove file from storage
+        instance.file.delete(save=False)
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
