@@ -61,17 +61,14 @@ class TaskSerializer(serializers.ModelSerializer):
 
 # comment serializer
 class CommentSerializer(serializers.ModelSerializer):
-    author = serializers.ReadOnlyField(source='author.id')
+    author = serializers.ReadOnlyField(source='author.username')
     class Meta:
         model = Comment
-        fields = ['id','task','author','content','created_at','updated_at']
-        read_only_fields = ['id','author','created_at','updated_at']
+        fields = ['id','author','content','created_at','updated_at']
+        read_only_fields = ['id','author','created_at','updated_at',"task"]
 
 
-    def create(self, validated_data):
-        validated_data['author'] = self.context['request'].user
-        return super().create(validated_data)
-    
+
     
     
 # bulk task create serializer

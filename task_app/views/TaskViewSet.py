@@ -188,30 +188,51 @@ class TaskViewSet(viewsets.ModelViewSet):
 
 # comment view set 
 class CommentViewSet(viewsets.ModelViewSet):
-    """
-    Nested-like comment endpoints (we use task_pk in URL conf).
-    Expected URL pattern: /tasks/{task_pk}/comments/...
-    """
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
-
+    pagination_class = None
+    
+    
     def get_queryset(self):
-        task_id = self.kwargs.get("task_pk")
         qs = Comment.objects.select_related("author").filter(is_deleted=False)
-        if task_id:
+
+        # Only check task_pk for list() API call
+        if self.action == "list":
+            task_id = self.request.query_params.get("task_pk")
+            print("task id in comment", task_id)
+            if not task_id:
+                raise ValidationError({"task_pk": "task_pk is required"})
             qs = qs.filter(task_id=task_id)
+
         return qs.order_by("-created_at")
 
-    def perform_create(self, serializer):
-        task_id = self.kwargs.get("task_pk")
+    def create(self, request, *args, **kwargs):
+        task_id = self.request.data.get("task_id")  # <-- from request body
+        if not task_id:
+            raise ValidationError({"task_id": "task_id is required"})
         task = get_object_or_404(Task, pk=task_id, is_deleted=False)
-        serializer.save(author=self.request.user, task=task)
+        print("task",task.title)
+        comment = Comment.objects.create(
+            task=task,
+            author=request.user,
+            content=request.data.get("content", ""),
+        )
+        print("comment",comment.content,comment.author)
+        serializer = self.get_serializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if instance.author != request.user:
+            return Response({"detail": "You do not have permission to delete this comment."}, status=status.HTTP_403_FORBIDDEN)
         instance.soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    def partial_update(self, request, *args, **kwargs):
+        print("partial update called",request.data) 
+        return super().partial_update(request, *args, **kwargs)
 
 
 
